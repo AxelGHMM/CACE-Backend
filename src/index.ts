@@ -15,9 +15,7 @@ import uploadRoutes from "./routes/uploadRoutes"; // Importar las rutas de uploa
 dotenv.config(); // Carga las variables de entorno desde el archivo .env
 
 const app = express();
-app.get("/api/health", (req, res) => {
-  res.status(200).send("✅ API activa");
-});
+
 
 // Configuración de puertos y CORS
 const PORT = process.env.BACKEND_PORT || 5000;
@@ -36,22 +34,28 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-const PING_URL = process.env.RENDER_APP_URL +  "/api/health" || `http://localhost:${PORT}`;
+app.get("/api/health", (req, res) => {
+  res.status(200).send("✅ API activa");
+});
+
+// 🔹 Ping automático para mantener la app despierta en Render
+const PING_URL = process.env.RENDER_APP_URL ? `${process.env.RENDER_APP_URL}/api/health` : `http://localhost:${PORT}/api/health`;
 
 const sendPing = async () => {
   try {
     const response = await axios.get(PING_URL);
     console.log(`✅ Ping exitoso a ${PING_URL} - Status: ${response.status}`);
   } catch (error: any) {
-    console.error("⚠️ Error en el ping:", error.message);
+    console.error(`⚠️ Error en el ping a ${PING_URL}: ${error.message}`);
   }
 };
 
 // 🔹 Hacer un ping al iniciar para confirmar que funciona
 sendPing();
 
-// 🔹 Luego, seguir enviando pings cada 10 minutos
-setInterval(sendPing, 60 * 1000);
+// 🔹 Luego, seguir enviando pings **cada 1 minuto**
+setInterval(sendPing, 60 * 1000); // 60 segundos
+
 
 app.use(express.json()); // Middleware para procesar JSON
 
