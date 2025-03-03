@@ -9,6 +9,7 @@ import subjectRoutes from "./routes/subjectRoutes";
 import assignmentRoutes from "./routes/assignmentRoutes";
 import attendanceRoutes from "./routes/attendanceRoutes";
 import adminRoutes from "./routes/adminRoutes"
+import axios from "axios";
 import uploadRoutes from "./routes/uploadRoutes"; // Importar las rutas de upload
 
 dotenv.config(); // Carga las variables de entorno desde el archivo .env
@@ -18,11 +19,30 @@ const app = express();
 // Configuración de puertos y CORS
 const PORT = process.env.BACKEND_PORT || 5000;
 
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"];
+
 app.use(cors({
-  origin: "*",  // Permitir cualquier origen
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("No autorizado por CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+const PING_URL = process.env.RENDER_APP_URL || `http://localhost:${PORT}`;
+
+setInterval(async () => {
+  try {
+    const response = await axios.get(PING_URL);
+    console.log(`🔄 Ping enviado a ${PING_URL} - Status: ${response.status}`);
+  } catch (error) {
+   
+  }
+}, 10 * 60 * 1000);
 
 app.use(express.json()); // Middleware para procesar JSON
 

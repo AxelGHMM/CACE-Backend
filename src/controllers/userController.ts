@@ -4,11 +4,87 @@ import jwt from "jsonwebtoken";
 import userModel from "../models/userModel";
 import { body, validationResult } from "express-validator";
 
+const failedAttempts: Record<string, { count: number; timestamp: number }> = {};
+const MAX_ATTEMPTS = 5; // Intentos fallidos permitidos
+const BLOCK_TIME = 15 * 60 * 1000; // 15 minutos
+
+const trackFailedLogin = (email: string, ip: string) => {
+  const key = `${email}:${ip}`;
+
+  if (!failedAttempts[key]) {
+    failedAttempts[key] = { count: 1, timestamp: Date.now() };
+  } else {
+    failedAttempts[key].count++;
+    failedAttempts[key].timestamp = Date.now();
+  }
+};
+
+const isBlocked = (email: string, ip: string): boolean => {
+  const key = `${email}:${ip}`;
+  if (failedAttempts[key] && failedAttempts[key].count >= MAX_ATTEMPTS) {
+    const timeElapsed = Date.now() - failedAttempts[key].timestamp;
+    return timeElapsed < BLOCK_TIME;
+  }
+  return false;
+};
+
 // Middleware para validar datos de entrada
 export const validateUser = [
   body("email").isEmail().withMessage("Debe ser un email válido"),
   body("password").isLength({ min: 6 }).withMessage("La contraseña debe tener al menos 6 caracteres"),
 ];
+
+export const loginUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+    const ip = (req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "") as string;
+
+    if (!email || !password) {
+      res.status(400).json({ error: "Email y contraseña son obligatorios." });
+      return;
+    }
+
+    // 🔹 Verificar si el usuario está bloqueado
+    if (isBlocked(email, ip)) {
+      res.status(429).json({ error: "Demasiados intentos. Intente nuevamente en 15 minutos." });
+      return;
+    }
+
+    const user = await userModel.getUserByEmail(email);
+    if (!user) {
+      trackFailedLogin(email, ip);
+      res.status(404).json({ error: "Usuario no encontrado." });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      trackFailedLogin(email, ip);
+      res.status(401).json({ error: "Contraseña incorrecta." });
+      return;
+    }
+
+    // 🔹 Si el login es exitoso, resetear intentos fallidos
+    const key = `${email}:${ip}`;
+    delete failedAttempts[key];
+
+    // Generar el token con una clave secreta segura
+    const token = jwt.sign(
+      { id: user.id, name: user.name, role: user.role },
+      process.env.JWT_SECRET || "defaultsecret",
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      message: "Inicio de sesión exitoso.",
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error("Error al iniciar sesión:", error);
+    res.status(500).json({ error: "Error en el servidor." });
+  }
+};
 
 // Obtener todos los usuarios (sin exponer contraseñas)
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
@@ -102,45 +178,6 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// Login con validaciones y protección contra fuerza bruta
-export const loginUser = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({ error: "Email y contraseña son obligatorios." });
-      return;
-    }
-
-    const user = await userModel.getUserByEmail(email);
-    if (!user) {
-      res.status(404).json({ error: "Usuario no encontrado." });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      res.status(401).json({ error: "Contraseña incorrecta." });
-      return;
-    }
-
-    // Generar el token con una clave secreta segura
-    const token = jwt.sign(
-      { id: user.id, name: user.name, role: user.role },
-      process.env.JWT_SECRET || "defaultsecret",
-      { expiresIn: "1h" }
-    );
-
-    res.status(200).json({
-      message: "Inicio de sesión exitoso.",
-      token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
-  } catch (error) {
-    console.error("Error al iniciar sesión:", error);
-    res.status(500).json({ error: "Error en el servidor." });
-  }
-};
 
 // Eliminar usuario de forma lógica
 export const deleteUser = async (req: Request, res: Response): Promise<void> => {

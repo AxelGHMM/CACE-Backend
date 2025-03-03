@@ -6,12 +6,18 @@ import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-// 🔹 Límite de intentos de login (5 intentos cada 15 minutos)
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5,
-  message: "Demasiados intentos de login. Intente de nuevo más tarde.",
-});
+
+
+const loginAttemptLimiter = (req: Request, res: Response, next: Function): void => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Debe proporcionar un correo electrónico." });
+    return;
+  }
+
+  next(); // 🔹 Asegura que pase al siguiente middleware
+};
+
 
 router.post("/register", userController.createUser);
 
@@ -31,7 +37,7 @@ router.get("/me", verifyToken, (req: CustomRequest, res: Response) => {
 });
 
 // 🔹 Se aplica el limitador de intentos de login
-router.post("/login", loginLimiter, userController.loginUser);
+router.post("/login", loginAttemptLimiter, userController.loginUser);
 
 router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Response) => {
   try {
