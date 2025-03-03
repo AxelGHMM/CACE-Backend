@@ -36,7 +36,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-const PING_URL = process.env.RENDER_APP_URL + + "/api/health" || `http://localhost:${PORT}`;
+const PING_URL = process.env.RENDER_APP_URL +  "/api/health" || `http://localhost:${PORT}`;
 
 const sendPing = async () => {
   try {
