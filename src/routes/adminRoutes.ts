@@ -4,6 +4,7 @@ import db from "../config/db"; // Ajusta esto según tu conexión a la BD
 
 const router = Router();
 
+
 router.get("/homepage", verifyToken, async (req, res) => {
   try {
     // 🔹 Consultas con parámetros seguros

@@ -15,6 +15,9 @@ import uploadRoutes from "./routes/uploadRoutes"; // Importar las rutas de uploa
 dotenv.config(); // Carga las variables de entorno desde el archivo .env
 
 const app = express();
+app.get("/api/health", (req, res) => {
+  res.status(200).send("✅ API activa");
+});
 
 // Configuración de puertos y CORS
 const PORT = process.env.BACKEND_PORT || 5000;
@@ -33,7 +36,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-const PING_URL = process.env.RENDER_APP_URL || `http://localhost:${PORT}`;
+const PING_URL = process.env.RENDER_APP_URL + + "/api/health" || `http://localhost:${PORT}`;
 
 const sendPing = async () => {
   try {
