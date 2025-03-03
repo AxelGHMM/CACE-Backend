@@ -39,10 +39,10 @@ setInterval(async () => {
   try {
     const response = await axios.get(PING_URL);
     console.log(`🔄 Ping enviado a ${PING_URL} - Status: ${response.status}`);
-  } catch (error) {
-   
+  } catch (error: any) {
+    console.error("⚠️ Error en el ping:", error.message);
   }
-}, 10 * 60 * 1000);
+}, 10 * 60 * 1000); // Cada 10 minutos
 
 app.use(express.json()); // Middleware para procesar JSON
 
