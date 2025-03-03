@@ -35,14 +35,20 @@ app.use(cors({
 
 const PING_URL = process.env.RENDER_APP_URL || `http://localhost:${PORT}`;
 
-setInterval(async () => {
+const sendPing = async () => {
   try {
     const response = await axios.get(PING_URL);
-    console.log(`🔄 Ping enviado a ${PING_URL} - Status: ${response.status}`);
+    console.log(`✅ Ping exitoso a ${PING_URL} - Status: ${response.status}`);
   } catch (error: any) {
     console.error("⚠️ Error en el ping:", error.message);
   }
-}, 10 * 60 * 1000); // Cada 10 minutos
+};
+
+// 🔹 Hacer un ping al iniciar para confirmar que funciona
+sendPing();
+
+// 🔹 Luego, seguir enviando pings cada 10 minutos
+setInterval(sendPing, 10 * 60 * 1000);
 
 app.use(express.json()); // Middleware para procesar JSON
 
