@@ -48,7 +48,7 @@ const sendPing = async () => {
 sendPing();
 
 // 🔹 Luego, seguir enviando pings cada 10 minutos
-setInterval(sendPing, 10 * 60 * 1000);
+setInterval(sendPing, 60 * 1000);
 
 app.use(express.json()); // Middleware para procesar JSON
 
