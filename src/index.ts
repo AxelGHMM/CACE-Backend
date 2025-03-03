@@ -41,7 +41,7 @@ const PING_URL = process.env.RENDER_APP_URL ? `${process.env.RENDER_APP_URL}/api
 const sendPing = async () => {
   try {
     const response = await axios.get(PING_URL);
-    console.log(`✅ [${new Date().toLocaleString()}] Ping exitoso a ${PING_URL} - Status: ${response.status}`);
+    console.log(`✅ [${new Date().toLocaleString()}] Api activada`);
   } catch (error: any) {
     console.error(`⚠️ [${new Date().toLocaleString()}] Error en el ping a ${PING_URL}: ${error.message}`);
   }
@@ -54,7 +54,7 @@ console.log(`🚀 [${new Date().toLocaleString()}] API iniciada en http://0.0.0.
 sendPing();
 
 // 🔹 Luego, seguir enviando pings **cada 1 minuto**
-setInterval(sendPing, 60 * 1000); // 60 segundos
+setInterval(sendPing, 10 * 60 * 1000); // 60 segundos
 
 app.use(express.json()); // Middleware para procesar JSON
 
