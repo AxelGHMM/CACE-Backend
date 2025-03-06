@@ -64,7 +64,7 @@ const updateAssignment = async (id: number, assignment: Partial<Assignment>): Pr
 
 // 🔹 Eliminar una asignación (eliminación lógica)
 const deleteAssignment = async (id: number): Promise<void> => {
-  const query = `UPDATE assignments SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1;`;
+  const query = `UPDATE assignments SET is_active = false, deleted_at = CURRENT_TIMESTAMP WHERE id = $1;`;
   await pool.query(query, [id]);
 };
 
