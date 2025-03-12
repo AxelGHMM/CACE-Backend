@@ -6,9 +6,35 @@ interface Attendance {
   user_id: number;
   subject_id: number;
   date: string;
+  time?: string; // Opcional porque la base de datos lo asigna automáticamente
   status: "presente" | "ausente" | "retardo";
 }
 
+// 🔹 Registrar múltiples asistencias con `time` automático
+const createAttendances = async (attendances: Attendance[]): Promise<Attendance[]> => {
+  if (attendances.length === 0) {
+    throw new Error("No hay asistencias para registrar");
+  }
+
+  const query = `
+    INSERT INTO attendances (student_id, user_id, subject_id, date, time, status)
+    VALUES ${attendances.map((_ : Attendance, i: number) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, DEFAULT, $${i * 5 + 5})`).join(", ")}
+    ON CONFLICT (student_id, subject_id, date, time)
+    DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
+    RETURNING *;
+  `;
+
+  const values = attendances.flatMap((attendance: Attendance) => [
+    attendance.student_id,
+    attendance.user_id,
+    attendance.subject_id,
+    attendance.date,
+    attendance.status.toLowerCase(),
+  ]);
+
+  const result = await pool.query(query, values);
+  return result.rows;
+};
 // 🔹 Obtener lista de alumnos por grupo y materia
 const getAttendanceByGroupAndSubject = async (groupId: number, subjectId: number) => {
   const query = `
@@ -22,34 +48,7 @@ const getAttendanceByGroupAndSubject = async (groupId: number, subjectId: number
     status: "presente", // Todos inician como presentes por defecto
   }));
 };
-
-// 🔹 Registrar múltiples asistencias en una sola consulta
-const createAttendances = async (attendances: Attendance[]) => {
-  if (attendances.length === 0) {
-    throw new Error("No hay asistencias para registrar");
-  }
-
-  const query = `
-    INSERT INTO attendances (student_id, user_id, subject_id, date, status)
-    VALUES ${attendances.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(", ")}
-    ON CONFLICT (student_id, subject_id, date)
-    DO UPDATE SET status = EXCLUDED.status
-    RETURNING *;
-  `;
-
-  const values = attendances.flatMap(attendance => [
-    attendance.student_id,
-    attendance.user_id,
-    attendance.subject_id,
-    attendance.date,
-    attendance.status.toLowerCase(),
-  ]);
-
-  const result = await pool.query(query, values);
-  return result.rows;
-};
-
 export default {
-  getAttendanceByGroupAndSubject,
   createAttendances,
+  getAttendanceByGroupAndSubject
 };

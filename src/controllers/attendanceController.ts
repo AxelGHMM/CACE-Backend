@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import attendanceModel from "../models/attendanceModel";
 
-// Obtener lista de alumnos por grupo y materia
+// 🔹 Obtener lista de alumnos por grupo y materia
 export const getAttendanceByGroupAndSubject = async (req: Request, res: Response) => {
   const { groupId, subjectId } = req.params;
 
@@ -24,7 +24,6 @@ export const getAttendanceByGroupAndSubject = async (req: Request, res: Response
   }
 };
 
-// Registrar asistencias
 export const createAttendances = async (req: Request, res: Response) => {
   const { group_id, subject_id, date, attendances } = req.body;
   const user_id = req.user?.id;
@@ -55,3 +54,5 @@ export const createAttendances = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+
