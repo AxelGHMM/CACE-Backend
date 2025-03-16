@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel";
 import { body, validationResult } from "express-validator";
+import logger from "../utils/logger.js"; // 🔹 Importar Winston
 
 const failedAttempts: Record<string, { count: number; timestamp: number }> = {};
 const MAX_ATTEMPTS = 5; // Intentos fallidos permitidos
@@ -39,13 +40,16 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body;
     const ip = (req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "") as string;
 
+    logger.info(`Intento de login con usuario: ${email} desde IP: ${ip}`);
+
     if (!email || !password) {
+      logger.warn("Intento de login fallido: Falta email o contraseña");
       res.status(400).json({ error: "Email y contraseña son obligatorios." });
       return;
     }
 
-    // 🔹 Verificar si el usuario está bloqueado
     if (isBlocked(email, ip)) {
+      logger.warn(`Usuario bloqueado por intentos fallidos: ${email} desde IP: ${ip}`);
       res.status(429).json({ error: "Demasiados intentos. Intente nuevamente en 15 minutos." });
       return;
     }
@@ -53,6 +57,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     const user = await userModel.getUserByEmail(email);
     if (!user) {
       trackFailedLogin(email, ip);
+      logger.warn(`Intento de login con usuario no registrado: ${email}`);
       res.status(404).json({ error: "Usuario no encontrado." });
       return;
     }
@@ -60,6 +65,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       trackFailedLogin(email, ip);
+      logger.warn(`Contraseña incorrecta para usuario: ${email}`);
       res.status(401).json({ error: "Contraseña incorrecta." });
       return;
     }
@@ -75,13 +81,14 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       { expiresIn: "1h" }
     );
 
+    logger.info(`Inicio de sesión exitoso para usuario: ${email}`);
     res.status(200).json({
       message: "Inicio de sesión exitoso.",
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
-  } catch (error) {
-    console.error("Error al iniciar sesión:", error);
+  } catch (error: unknown) {
+    logger.error(`Error al iniciar sesión: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     res.status(500).json({ error: "Error en el servidor." });
   }
 };
@@ -89,63 +96,14 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 // Obtener todos los usuarios (sin exponer contraseñas)
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
+    logger.info("Obteniendo todos los usuarios");
+
     const users = await userModel.getUsers();
     res.status(200).json(users);
-  } catch (error) {
-    console.error("Error al obtener usuarios:", error);
-    res.status(500).json({ error: "Error interno del servidor" });
-  }
-};
 
-// Obtener usuario por ID con validación
-export const getUserById = async (req: Request, res: Response): Promise<void> => {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "ID de usuario inválido" });
-    return;
-  }
-
-  try {
-    const user = await userModel.getUserById(id);
-    if (!user) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
-    res.status(200).json(user);
-  } catch (error) {
-    console.error("Error al obtener usuario:", error);
-    res.status(500).json({ error: "Error interno del servidor" });
-  }
-};
-
-// Crear un nuevo usuario con validación y protección contra duplicados
-export const createUser = async (req: Request, res: Response): Promise<void> => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({ errors: errors.array() });
-    return;
-  }
-
-  const { name, email, password, role } = req.body;
-
-  try {
-    const existingUser = await userModel.getUserByEmail(email);
-    if (existingUser) {
-      res.status(400).json({ error: "El correo ya está registrado." });
-      return;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await userModel.createUser({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
-
-    res.status(201).json({ id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role });
-  } catch (error) {
-    console.error("Error al crear usuario:", error);
+    logger.info(`Usuarios obtenidos exitosamente (${users.length} registros)`);
+  } catch (error: unknown) {
+    logger.error(`Error al obtener usuarios: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
@@ -154,6 +112,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
+    logger.warn(`Intento de actualización fallido: ID inválido (${req.params.id})`);
     res.status(400).json({ error: "ID de usuario inválido" });
     return;
   }
@@ -168,30 +127,34 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 
     const updatedUser = await userModel.updateUser(id, { name, email, password: hashedPassword, role });
     if (!updatedUser) {
+      logger.warn(`Intento de actualización fallido: Usuario con ID ${id} no encontrado`);
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
+    
+    logger.info(`Usuario con ID ${id} actualizado correctamente`);
     res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Error al actualizar usuario:", error);
+  } catch (error: unknown) {
+    logger.error(`Error al actualizar usuario: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
-
 
 // Eliminar usuario de forma lógica
 export const deleteUser = async (req: Request, res: Response): Promise<void> => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
+    logger.warn(`Intento de eliminación fallido: ID inválido (${req.params.id})`);
     res.status(400).json({ error: "ID de usuario inválido" });
     return;
   }
 
   try {
     await userModel.deleteUser(id);
+    logger.info(`Usuario con ID ${id} eliminado lógicamente`);
     res.status(200).json({ message: "Usuario eliminado lógicamente" });
-  } catch (error) {
-    console.error("Error al eliminar usuario:", error);
+  } catch (error: unknown) {
+    logger.error(`Error al eliminar usuario: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
@@ -200,15 +163,20 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
 export const getUsersByRole = async (req: Request, res: Response): Promise<void> => {
   const { role } = req.params;
   if (!role) {
+    logger.warn("Intento de consulta de usuarios fallido: Falta el rol");
     res.status(400).json({ error: "El rol es obligatorio" });
     return;
   }
 
   try {
+    logger.info(`Obteniendo usuarios con rol: ${role}`);
+
     const users = await userModel.getUsersByRole(role);
     res.status(200).json(users);
-  } catch (error) {
-    console.error(`Error al obtener usuarios con rol ${role}:`, error);
+
+    logger.info(`Usuarios con rol ${role} obtenidos exitosamente (${users.length} registros)`);
+  } catch (error: unknown) {
+    logger.error(`Error al obtener usuarios con rol ${role}: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
