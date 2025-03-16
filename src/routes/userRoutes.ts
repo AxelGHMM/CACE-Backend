@@ -15,7 +15,7 @@ const loginAttemptLimiter = (req: Request, res: Response, next: Function): void 
     return;
   }
 
-  next(); // 🔹 Asegura que pase al siguiente middleware
+  next(); // 🔹 Asegura que pase al npsiguiente middleware
 };
 
 

@@ -1,7 +1,7 @@
 import winston from "winston";
 import path from "path";
 
-// Configuración de niveles de log
+// 🔹 Configuración de niveles de log
 const customLevels = {
   levels: {
     error: 0,
@@ -21,7 +21,7 @@ const customLevels = {
 
 winston.addColors(customLevels.colors);
 
-// Configuración del formato de logs
+// 🔹 Formato de logs
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
   winston.format.printf(({ timestamp, level, message }) => {
@@ -29,14 +29,25 @@ const logFormat = winston.format.combine(
   })
 );
 
-// Configuración de Winston
+// 🔹 Configuración de Winston con múltiples archivos de salida
 const logger = winston.createLogger({
   levels: customLevels.levels,
   format: logFormat,
   transports: [
+    // Consola para todos los niveles
     new winston.transports.Console({ level: "debug" }),
+
+    // Archivo para logs generales de la app
+    new winston.transports.File({ filename: path.join("logs", "app.log"), level: "info" }),
+
+    // Archivo exclusivo para errores
     new winston.transports.File({ filename: path.join("logs", "error.log"), level: "error" }),
-    new winston.transports.File({ filename: path.join("logs", "combined.log"), level: "info" }),
+
+    // Archivo para peticiones HTTP
+    new winston.transports.File({ filename: path.join("logs", "http.log"), level: "http" }),
+
+    // Archivo específico para la API activa y pings
+    new winston.transports.File({ filename: path.join("logs", "health.log"), level: "info" }),
   ],
 });
 

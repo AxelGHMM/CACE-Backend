@@ -2,11 +2,13 @@ import { Request, Response } from "express";
 import pool from "../config/db";
 import { createGradesForStudent } from "../controllers/gradeController";
 import { validationResult } from "express-validator";
+import logger from "../utils/logger"; // Importar Winston
 
 export const uploadStudents = async (req: Request, res: Response): Promise<void> => {
   // Validación de datos
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    logger.warn("Errores de validación en la carga de estudiantes", { errors: errors.array() });
     res.status(400).json({ errors: errors.array() });
     return;
   }
@@ -15,6 +17,7 @@ export const uploadStudents = async (req: Request, res: Response): Promise<void>
 
   try {
     if (!groupId || !Array.isArray(data)) {
+      logger.warn("Datos inválidos recibidos en la carga de estudiantes");
       res.status(400).json({ error: "Datos inválidos. Verifica el grupo y el archivo." });
       return;
     }
@@ -22,11 +25,13 @@ export const uploadStudents = async (req: Request, res: Response): Promise<void>
     const client = await pool.connect();
 
     try {
+      logger.info(`Iniciando carga de ${data.length} estudiantes al grupo ${groupId}`);
+
       for (const student of data) {
         const { name, email, matricula } = student;
 
         if (!name || !matricula) {
-          console.warn(`Registro inválido encontrado: ${JSON.stringify(student)}`);
+          logger.warn(`Registro inválido encontrado y omitido: ${JSON.stringify(student)}`);
           continue;
         }
 
@@ -47,16 +52,18 @@ export const uploadStudents = async (req: Request, res: Response): Promise<void>
       }
 
       await client.query("COMMIT");
+      logger.info(`Carga exitosa de estudiantes al grupo ${groupId}`);
       res.status(200).json({ message: "Archivo subido y estudiantes registrados correctamente." });
+
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error al procesar el archivo:", error);
+      logger.error(`Error al procesar el archivo de carga: ${error}`);
       res.status(500).json({ error: "Error interno del servidor" });
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error("Error al establecer conexión con la base de datos:", error);
+    logger.error(`Error al establecer conexión con la base de datos: ${error}`);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
