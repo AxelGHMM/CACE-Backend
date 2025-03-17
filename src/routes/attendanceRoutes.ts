@@ -19,9 +19,18 @@ const validateAttendances = [
   body("attendances.*.student_id").isInt().withMessage("Cada asistencia debe tener un ID de estudiante válido"),
   body("attendances.*.status").isIn(["presente", "ausente", "retardo"]).withMessage("El estado de asistencia no es válido"),
 ];
+const validateStudentId = [
+  param("studentId").isInt().withMessage("El ID del estudiante debe ser un número entero"),
+];
+
+const validateDate = [
+  param("date").isISO8601().withMessage("La fecha debe estar en formato ISO 8601"),
+];
 
 // 🔹 Rutas protegidas con token y validaciones
 router.get("/group/:groupId/subject/:subjectId", verifyToken, validateGroupAndSubject, attendanceController.getAttendanceByGroupAndSubject);
 router.post("/submit", verifyToken, validateAttendances, attendanceController.createAttendances);
+router.get("/student/:studentId", verifyToken, validateStudentId, attendanceController.getAttendanceByStudent);
+router.get("/date/:date", verifyToken, validateDate, attendanceController.getAttendanceByDate);
 
 export default router;

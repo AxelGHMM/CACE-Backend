@@ -62,3 +62,27 @@ export const createAttendances = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+export const getAttendanceByStudent = async (req: Request, res: Response) => {
+  const { studentId } = req.params;
+
+  try {
+    const attendanceRecords = await attendanceModel.getAttendanceByStudent(parseInt(studentId));
+    res.status(200).json(attendanceRecords);
+  } catch (error) {
+    logger.error(`Error al obtener asistencias: ${error}`);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// 🔹 Obtener asistencias por fecha separadas por hora
+export const getAttendanceByDate = async (req: Request, res: Response) => {
+  const { date } = req.params;
+
+  try {
+    const attendanceRecords = await attendanceModel.getAttendanceByDate(date);
+    res.status(200).json(attendanceRecords);
+  } catch (error) {
+    logger.error(`Error al obtener asistencias: ${error}`);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
