@@ -41,41 +41,42 @@ router.post("/login", loginAttemptLimiter, userController.loginUser);
 
 router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Response) => {
   try {
-    // 🔹 Asistencias mensuales (últimos 5 meses)
-    const attendanceDataResult = await db.query(`
-      SELECT EXTRACT(MONTH FROM date) AS month, COUNT(*) AS count
-      FROM attendances WHERE is_active = true
-      GROUP BY month ORDER BY month;
-    `);
-    let attendanceData = Array(5).fill(0); // Inicializar con ceros
+    const teacherId = req.user.id; // Obtener ID del profesor autenticado
 
-    attendanceDataResult.rows.forEach((row: any) => {
-      const monthIndex = row.month - 1;
-      if (monthIndex >= 0 && monthIndex < 5) {
-        attendanceData[monthIndex] = parseInt(row.count, 10); // Convertir a número
-      }
-    });
+    // 🔹 Obtener asistencias por grupo y materia
+    const attendanceResult = await db.query(
+      `
+      WITH AssignedGroups AS (
+          SELECT DISTINCT a.group_id, g.name AS group_name, sb.name AS subject_name
+          FROM assignments a
+          JOIN groups g ON a.group_id = g.id
+          JOIN subjects sb ON a.subject_id = sb.id
+          WHERE a.teacher_id = $1
+      )
+      SELECT ag.group_name, ag.subject_name, COUNT(a.id) AS attendance_count
+      FROM attendances a
+      JOIN students s ON a.student_id = s.id
+      JOIN AssignedGroups ag ON s.group_id = ag.group_id
+      WHERE a.is_active = true AND a.date >= CURRENT_DATE - INTERVAL '5 months'
+      GROUP BY ag.group_name, ag.subject_name
+      ORDER BY ag.group_name;
+      `,
+      [teacherId]
+    );
 
-    // 🔹 Cantidad de estudiantes por grupo
-    const gradesDataResult = await db.query(`
-      SELECT g.id, COUNT(s.id) AS count
-      FROM groups g
-      LEFT JOIN students s ON s.group_id = g.id AND s.is_active = true
-      GROUP BY g.id ORDER BY g.id;
-    `);
-    const gradesData = gradesDataResult.rows.map((row: any) => parseInt(row.count, 10));
+    const attendanceData = attendanceResult.rows.map((row: any) => ({
+      group: row.group_name,
+      subject: row.subject_name,
+      count: parseInt(row.attendance_count, 10),
+    }));
 
-    // 🔹 Respuesta con los datos de gráficas
-    res.status(200).json({
-      attendanceData,
-      gradesData,
-    });
-
+    res.status(200).json({ attendanceData });
   } catch (error) {
-    console.error("Error en la carga de datos para gráficas:", error);
-    res.status(500).json({ error: "Error en la carga de gráficas" });
+    console.error("Error al obtener los datos:", error);
+    res.status(500).json({ error: "Error en la carga de datos" });
   }
 });
+
 
 router.get("/homepage", verifyToken, (req: Request, res: Response) => {
   res.status(200).json({ message: "Bienvenido al HomePage", user: req.user });
