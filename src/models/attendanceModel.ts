@@ -17,10 +17,10 @@ const createAttendances = async (attendances: Attendance[]): Promise<Attendance[
   }
 
   const query = `
-    INSERT INTO attendances (student_id, user_id, subject_id, status, is_active)
-    VALUES ${attendances.map((_ : Attendance, i: number) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, true)`).join(", ")}
+    INSERT INTO attendances (student_id, user_id, subject_id, date, time, status)
+    VALUES ${attendances.map((_ : Attendance, i: number) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, DEFAULT, $${i * 5 + 5})`).join(", ")}
     ON CONFLICT (student_id, subject_id, date, time)
-    DO UPDATE SET status = EXCLUDED.status, updated_at = NOW(), is_active = true
+    DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
     RETURNING *;
   `;
 
@@ -28,14 +28,13 @@ const createAttendances = async (attendances: Attendance[]): Promise<Attendance[
     attendance.student_id,
     attendance.user_id,
     attendance.subject_id,
+    attendance.date,
     attendance.status.toLowerCase(),
   ]);
-
 
   const result = await pool.query(query, values);
   return result.rows;
 };
-
 
 // 🔹 Obtener asistencias por estudiante
 const getAttendanceByStudent = async (studentId: number) => {
