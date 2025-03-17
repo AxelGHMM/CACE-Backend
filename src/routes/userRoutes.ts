@@ -104,26 +104,26 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
     // 🔹 Obtener el promedio de asistencias
     const attendanceAverage = totalStudents > 0 ? `${Math.round((totalAttendance / totalStudents) * 100)}%` : "0%";
 
-    // 🔹 Obtener asistencias por grado (para la PieChart)
+    // 🔹 Obtener asistencias por grado (para la PieChart) usando la tabla `grades`
     const gradesResult = await db.query(
       `
       SELECT 
           CASE 
-              WHEN g.grade = 1 THEN '1° Grado'
-              WHEN g.grade = 2 THEN '2° Grado'
-              WHEN g.grade = 3 THEN '3° Grado'
+              WHEN gr.partial = 1 THEN '1° Grado'
+              WHEN gr.partial = 2 THEN '2° Grado'
+              WHEN gr.partial = 3 THEN '3° Grado'
           END AS grade,
           COUNT(a.id) AS attendance_count
       FROM attendances a
       JOIN students s ON a.student_id = s.id
-      JOIN groups g ON s.group_id = g.id
+      JOIN grades gr ON s.id = gr.student_id -- Relación con la tabla grades
       WHERE s.group_id IN (
           SELECT DISTINCT a.group_id
           FROM assignments a
           WHERE a.user_id = $1
       ) AND a.is_active = true
-      GROUP BY g.grade
-      ORDER BY g.grade;
+      GROUP BY gr.partial
+      ORDER BY gr.partial;
       `,
       [teacherId]
     );
@@ -142,8 +142,6 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
     res.status(500).json({ error: "Error en la carga de datos" });
   }
 });
-
-
 
 router.get("/homepage", verifyToken, (req: Request, res: Response) => {
   res.status(200).json({ message: "Bienvenido al HomePage", user: req.user });
