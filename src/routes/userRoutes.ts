@@ -41,9 +41,9 @@ router.post("/login", loginAttemptLimiter, userController.loginUser);
 
 router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Response) => {
   try {
-    const teacherId = req.user.id; // Obtener ID del profesor autenticado
+    const teacherId = req.user.id; // ID del profesor autenticado
 
-    // 🔹 Obtener asistencias por grupo y materia
+    // 🔹 1) Obtener asistencias por grupo y materia
     const attendanceResult = await db.query(
       `
       WITH AssignedGroups AS (
@@ -57,7 +57,8 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
       FROM attendances a
       JOIN students s ON a.student_id = s.id
       JOIN AssignedGroups ag ON s.group_id = ag.group_id
-      WHERE a.is_active = true AND a.date >= CURRENT_DATE - INTERVAL '5 months'
+      WHERE a.is_active = true 
+        AND a.date >= CURRENT_DATE - INTERVAL '5 months'
       GROUP BY ag.group_name, ag.subject_name
       ORDER BY ag.group_name;
       `,
@@ -70,7 +71,7 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
       count: parseInt(row.attendance_count, 10),
     }));
 
-    // 🔹 Obtener el total de asistencias
+    // 🔹 2) Obtener el total de asistencias
     const totalAttendanceResult = await db.query(
       `
       SELECT COUNT(*) AS total_attendance
@@ -80,13 +81,14 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
           SELECT DISTINCT a.group_id
           FROM assignments a
           WHERE a.user_id = $1
-      ) AND a.is_active = true;
+      )
+      AND a.is_active = true;
       `,
       [teacherId]
     );
     const totalAttendance = parseInt(totalAttendanceResult.rows[0]?.total_attendance || "0", 10);
 
-    // 🔹 Obtener el total de estudiantes registrados
+    // 🔹 3) Obtener el total de estudiantes registrados
     const totalStudentsResult = await db.query(
       `
       SELECT COUNT(DISTINCT s.id) AS total_students
@@ -101,47 +103,84 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
     );
     const totalStudents = parseInt(totalStudentsResult.rows[0]?.total_students || "0", 10);
 
-    // 🔹 Obtener el promedio de asistencias
-    const attendanceAverage = totalStudents > 0 ? `${Math.round((totalAttendance / totalStudents) * 100)}%` : "0%";
+    // 🔹 4) Calcular el promedio de asistencias (porcentaje) con dos decimales
+    const attendanceAverage =
+      totalStudents > 0
+        ? ((totalAttendance / totalStudents) * 100).toFixed(2) + "%"
+        : "0%";
 
-    // 🔹 Obtener asistencias por grado (para la PieChart) usando la tabla `grades`
+    // 🔹 5) Obtener datos de calificaciones para la PieChart
+    //     - Supongamos que "partial" indica el número de parcial (1, 2, 3).
+    //     - Contamos cuántos registros hay por cada parcial.
     const gradesResult = await db.query(
       `
-      SELECT 
-          CASE 
-              WHEN gr.partial = 1 THEN '1° Grado'
-              WHEN gr.partial = 2 THEN '2° Grado'
-              WHEN gr.partial = 3 THEN '3° Grado'
-          END AS grade,
-          COUNT(a.id) AS attendance_count
-      FROM attendances a
-      JOIN students s ON a.student_id = s.id
-      JOIN grades gr ON s.id = gr.student_id -- Relación con la tabla grades
+      SELECT gr.partial, COUNT(*) AS count
+      FROM grades gr
+      JOIN students s ON gr.student_id = s.id
       WHERE s.group_id IN (
           SELECT DISTINCT a.group_id
           FROM assignments a
           WHERE a.user_id = $1
-      ) AND a.is_active = true
+      )
       GROUP BY gr.partial
       ORDER BY gr.partial;
       `,
       [teacherId]
     );
 
-    const gradesData = [0, 0, 0];
+    // Calculamos el total de calificaciones registradas
+    let totalGradesCount = 0;
     gradesResult.rows.forEach((row: any) => {
-      if (row.grade === "1° Grado") gradesData[0] = parseInt(row.attendance_count, 10);
-      if (row.grade === "2° Grado") gradesData[1] = parseInt(row.attendance_count, 10);
-      if (row.grade === "3° Grado") gradesData[2] = parseInt(row.attendance_count, 10);
+      totalGradesCount += parseInt(row.count, 10);
+    });
+
+    // Mapeamos la data para la PieChart, incluyendo porcentaje
+    const gradesData = gradesResult.rows.map((row: any) => {
+      const count = parseInt(row.count, 10);
+      const partialNumber = parseInt(row.partial, 10);
+      let partialLabel = "";
+
+      switch (partialNumber) {
+        case 1:
+          partialLabel = "Parcial 1";
+          break;
+        case 2:
+          partialLabel = "Parcial 2";
+          break;
+        case 3:
+          partialLabel = "Parcial 3";
+          break;
+        default:
+          partialLabel = `Parcial ${partialNumber}`;
+          break;
+      }
+
+      const percentage =
+        totalGradesCount > 0
+          ? ((count / totalGradesCount) * 100).toFixed(2)
+          : "0";
+
+      return {
+        partial: partialLabel,
+        count,
+        percentage: percentage + "%",
+      };
     });
 
     // 🔹 Respuesta JSON con todos los datos
-    res.status(200).json({ attendanceData, gradesData, totalAttendance, totalStudents, attendanceAverage });
+    res.status(200).json({
+      attendanceData,
+      totalAttendance,
+      totalStudents,
+      attendanceAverage, // Promedio de asistencias
+      gradesData,        // Datos para la PieChart de calificaciones
+    });
   } catch (error) {
     console.error("Error al obtener los datos:", error);
     res.status(500).json({ error: "Error en la carga de datos" });
   }
 });
+
 
 router.get("/homepage", verifyToken, (req: Request, res: Response) => {
   res.status(200).json({ message: "Bienvenido al HomePage", user: req.user });
