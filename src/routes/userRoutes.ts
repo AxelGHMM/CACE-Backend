@@ -70,12 +70,79 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
       count: parseInt(row.attendance_count, 10),
     }));
 
-    res.status(200).json({ attendanceData });
+    // 🔹 Obtener el total de asistencias
+    const totalAttendanceResult = await db.query(
+      `
+      SELECT COUNT(*) AS total_attendance
+      FROM attendances a
+      JOIN students s ON a.student_id = s.id
+      WHERE s.group_id IN (
+          SELECT DISTINCT a.group_id
+          FROM assignments a
+          WHERE a.user_id = $1
+      ) AND a.is_active = true;
+      `,
+      [teacherId]
+    );
+    const totalAttendance = parseInt(totalAttendanceResult.rows[0]?.total_attendance || "0", 10);
+
+    // 🔹 Obtener el total de estudiantes registrados
+    const totalStudentsResult = await db.query(
+      `
+      SELECT COUNT(DISTINCT s.id) AS total_students
+      FROM students s
+      WHERE s.group_id IN (
+          SELECT DISTINCT a.group_id
+          FROM assignments a
+          WHERE a.user_id = $1
+      );
+      `,
+      [teacherId]
+    );
+    const totalStudents = parseInt(totalStudentsResult.rows[0]?.total_students || "0", 10);
+
+    // 🔹 Obtener el promedio de asistencias
+    const attendanceAverage = totalStudents > 0 ? `${Math.round((totalAttendance / totalStudents) * 100)}%` : "0%";
+
+    // 🔹 Obtener asistencias por grado (para la PieChart)
+    const gradesResult = await db.query(
+      `
+      SELECT 
+          CASE 
+              WHEN g.grade = 1 THEN '1° Grado'
+              WHEN g.grade = 2 THEN '2° Grado'
+              WHEN g.grade = 3 THEN '3° Grado'
+          END AS grade,
+          COUNT(a.id) AS attendance_count
+      FROM attendances a
+      JOIN students s ON a.student_id = s.id
+      JOIN groups g ON s.group_id = g.id
+      WHERE s.group_id IN (
+          SELECT DISTINCT a.group_id
+          FROM assignments a
+          WHERE a.user_id = $1
+      ) AND a.is_active = true
+      GROUP BY g.grade
+      ORDER BY g.grade;
+      `,
+      [teacherId]
+    );
+
+    const gradesData = [0, 0, 0];
+    gradesResult.rows.forEach((row: any) => {
+      if (row.grade === "1° Grado") gradesData[0] = parseInt(row.attendance_count, 10);
+      if (row.grade === "2° Grado") gradesData[1] = parseInt(row.attendance_count, 10);
+      if (row.grade === "3° Grado") gradesData[2] = parseInt(row.attendance_count, 10);
+    });
+
+    // 🔹 Respuesta JSON con todos los datos
+    res.status(200).json({ attendanceData, gradesData, totalAttendance, totalStudents, attendanceAverage });
   } catch (error) {
     console.error("Error al obtener los datos:", error);
     res.status(500).json({ error: "Error en la carga de datos" });
   }
 });
+
 
 
 router.get("/homepage", verifyToken, (req: Request, res: Response) => {
