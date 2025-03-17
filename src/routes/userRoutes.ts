@@ -51,7 +51,7 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
           FROM assignments a
           JOIN groups g ON a.group_id = g.id
           JOIN subjects sb ON a.subject_id = sb.id
-          WHERE a.teacher_id = $1
+          WHERE a.user_id = $1
       )
       SELECT ag.group_name, ag.subject_name, COUNT(a.id) AS attendance_count
       FROM attendances a
