@@ -51,18 +51,22 @@ app.get("/api/health", (req, res) => {
 });
 
 // 🔹 Función de ping para mantener la API activa en Render
-const PING_URL = process.env.RENDER_APP_URL 
-  ? `${process.env.RENDER_APP_URL}/api/health` 
-  : `http://localhost:${PORT}/api/health`;
+const PING_URL = process.env.RENDER_APP_URL;
 
 const sendPing = async () => {
+  if (!PING_URL) {
+    console.warn("❌ No se enviará ping porque PING_URL no está definida.");
+    return;
+  }
+
   try {
     await axios.get(PING_URL);
     logger.info(`✅ Ping exitoso: ${PING_URL}`, { label: "health" });
-  } catch (error: any) {
-    logger.error(`⚠️ Error en el ping a ${PING_URL}: ${error.message}`, { label: "health" });
+  } catch (error) {
+    console.error("⚠️ Error en el ping:", error);
   }
 };
+
 
 // 🔹 Registro al iniciar la API
 logger.info(`🚀 API iniciada en http://0.0.0.0:${PORT}`, { label: "app" });
