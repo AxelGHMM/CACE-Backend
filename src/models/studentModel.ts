@@ -17,25 +17,38 @@ const getStudentByMatricula = async (matricula: string): Promise<Omit<Student, "
 };
 const getAllStudentsGrouped = async (): Promise<Record<string, Omit<Student, "is_active">[]>> => {
   const query = `
-    SELECT group_id, id, name, email, matricula
-    FROM students
-    WHERE is_active = true
-    ORDER BY group_id, name;
+    SELECT s.id,
+           s.name,
+           s.email,
+           s.matricula,
+           s.group_id,
+           g.name AS group_name
+    FROM students s
+    JOIN groups g ON s.group_id = g.id
+    WHERE s.is_active = true
+    ORDER BY s.group_id, s.name;
   `;
   const result = await pool.query(query);
 
   const groupedStudents: Record<string, Omit<Student, "is_active">[]> = {};
 
-  result.rows.forEach((student: Omit<Student, "is_active">) => {
-    const groupKey = `grupo_${student.group_id}`;
+  result.rows.forEach((row) => {
+    // Usar el nombre real del grupo como clave
+    const groupKey = row.group_name; // p. ej. "GRUPO E"
+
+    // Inicializar el arreglo si no existe
     if (!groupedStudents[groupKey]) {
       groupedStudents[groupKey] = [];
     }
-    groupedStudents[groupKey].push(student);
+
+    // Agregar el estudiante al arreglo de su grupo
+    // (Puedes conservar `group_name` en el objeto o eliminarlo según tu necesidad)
+    groupedStudents[groupKey].push(row);
   });
 
   return groupedStudents;
 };
+
 
 // Obtener estudiantes por grupo con validación de datos
 const getStudentsByGroup = async (groupId: number): Promise<Omit<Student, "is_active">[]> => {
