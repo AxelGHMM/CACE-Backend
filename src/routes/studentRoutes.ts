@@ -12,5 +12,8 @@ const validateGroupId = [param("groupId").isInt().withMessage("El ID del grupo d
 // 🔹 Rutas protegidas con token y validaciones
 router.get("/:matricula", verifyToken, validateMatricula, studentController.getStudentByMatricula);
 router.get("/group/:groupId", verifyToken, validateGroupId, studentController.getStudentsByGroup);
+router.get("/", verifyToken, studentController.getAllStudentsGrouped);
+router.put("/:matricula", verifyToken, validateMatricula, studentController.updateStudent);
+router.delete("/:matricula", verifyToken, validateMatricula, studentController.deleteStudent);
 
 export default router;
