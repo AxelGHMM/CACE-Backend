@@ -34,8 +34,24 @@ const createGroup = async (name: string): Promise<Omit<Group, "is_active">> => {
   return result.rows[0];
 };
 
+// Actualizar el nombre de un grupo (solo si está activo)
+const updateGroup = async (id: number, name: string): Promise<Omit<Group, "is_active"> | undefined> => {
+  const query = `UPDATE groups SET name = $1 WHERE id = $2 AND is_active = true RETURNING id, name;`;
+  const result = await pool.query(query, [name, id]);
+  return result.rows[0];
+};
+
+// Eliminar lógicamente un grupo (actualizando is_active a false)
+const deleteGroup = async (id: number): Promise<boolean> => {
+  const query = `UPDATE groups SET is_active = false WHERE id = $1 AND is_active = true;`;
+  const result = await pool.query(query, [id]);
+  return result.rowCount! > 0;
+};
+
 export default {
   getGroupByName,
   getAllGroups,
   createGroup,
+  updateGroup,
+  deleteGroup,
 };
