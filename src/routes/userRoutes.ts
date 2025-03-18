@@ -113,9 +113,11 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
         SELECT 
           gr.partial, 
           gr.student_id, 
-          (COALESCE(gr.activity_1, 0) + COALESCE(gr.activity_2, 0) + 
-           COALESCE(gr.attendance, 0) + COALESCE(gr.project, 0) + 
-           COALESCE(gr.exam, 0)) / 5.0 AS student_avg
+          AVG(
+            (COALESCE(gr.activity_1, 0) + COALESCE(gr.activity_2, 0) + 
+             COALESCE(gr.attendance, 0) + COALESCE(gr.project, 0) + 
+             COALESCE(gr.exam, 0)) / 5.0
+          ) AS student_avg
         FROM grades gr
         JOIN students s ON gr.student_id = s.id
         WHERE s.group_id IN (
@@ -132,6 +134,7 @@ router.get("/homepage/stats", verifyToken, async (req: CustomRequest, res: Respo
       `,
       [teacherId]
     );
+    
     
 
     // 🔹 Procesar los datos para la PieChart
