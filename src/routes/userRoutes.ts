@@ -191,7 +191,7 @@ router.get(
         return;
       }
 
-      const filePath = path.join(__dirname, "..", "logs", filename);
+      const filePath = path.join(__dirname, "..","..", "logs", filename);
 
       if (!fs.existsSync(filePath)) {
         res.status(404).json({ error: `Archivo no encontrado: ${filename}` });
