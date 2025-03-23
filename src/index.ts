@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fs from 'fs';
+import path from 'path';
 import morgan from "morgan";
 import axios from "axios";
 import logger from "./utils/logger"; // Importar Winston
-
+import { Request, Response } from 'express';
 // Importar rutas
 import userRoutes from "./routes/userRoutes";
 import gradeRoutes from "./routes/gradeRoutes";

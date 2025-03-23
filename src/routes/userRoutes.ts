@@ -3,6 +3,9 @@ import * as userController from "../controllers/userController";
 import { verifyToken } from "../middleware/authMiddleware";
 import db from "../config/db"; // Ajusta esto según tu conexión a la BD
 import rateLimit from "express-rate-limit";
+import fs from "fs";
+import path from "path";
+
 
 const router = Router();
 
@@ -168,5 +171,28 @@ router.post("/", verifyToken, userController.createUser); // Crear usuario
 router.put("/:id", verifyToken, userController.updateUser); // Actualizar usuario
 router.delete("/:id", verifyToken, userController.deleteUser);
 router.get("/role/:role", verifyToken, userController.getUsersByRole);
+
+router.get('/logs/:filename', verifyToken, (req: Request<{ filename: string }>, res: Response) => {
+  const user = (req as any).user;
+  if (user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Acceso denegado: solo administradores' });
+  }
+
+  const allowedFiles = ['app.log', 'combined.log', 'error.log', 'health.log', 'http.log'];
+  const filename = req.params.filename;
+
+  if (!allowedFiles.includes(filename)) {
+    return res.status(403).json({ error: 'Archivo no permitido' });
+  }
+
+  const filePath = path.join(__dirname, '..', 'logs', filename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Archivo no encontrado' });
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  res.json({ filename, content });
+});
 
 export default router;
