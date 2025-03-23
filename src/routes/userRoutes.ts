@@ -172,27 +172,40 @@ router.put("/:id", verifyToken, userController.updateUser); // Actualizar usuari
 router.delete("/:id", verifyToken, userController.deleteUser);
 router.get("/role/:role", verifyToken, userController.getUsersByRole);
 
-router.get('/logs/:filename', verifyToken, (req: Request<{ filename: string }>, res: Response) => {
-  const user = (req as any).user;
-  if (user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Acceso denegado: solo administradores' });
+router.get(
+  "/logs/:filename",
+  verifyToken,
+  async (req: Request<{ filename: string }>, res: Response): Promise<void> => {
+    try {
+      const user = (req as any).user;
+      if (user?.role !== "admin") {
+        res.status(403).json({ error: "Acceso denegado: solo administradores" });
+        return;
+      }
+
+      const allowedFiles = ["app.log", "combined.log", "error.log", "health.log", "http.log"];
+      const filename = req.params.filename;
+
+      if (!allowedFiles.includes(filename)) {
+        res.status(403).json({ error: "Archivo no permitido" });
+        return;
+      }
+
+      const filePath = path.join(__dirname, "..", "logs", filename);
+
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ error: "Archivo no encontrado" });
+        return;
+      }
+
+      const content = fs.readFileSync(filePath, "utf8");
+      res.json({ filename, content });
+    } catch (error) {
+      console.error("Error al obtener el log:", error);
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
   }
+);
 
-  const allowedFiles = ['app.log', 'combined.log', 'error.log', 'health.log', 'http.log'];
-  const filename = req.params.filename;
-
-  if (!allowedFiles.includes(filename)) {
-    return res.status(403).json({ error: 'Archivo no permitido' });
-  }
-
-  const filePath = path.join(__dirname, '..', 'logs', filename);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Archivo no encontrado' });
-  }
-
-  const content = fs.readFileSync(filePath, 'utf8');
-  res.json({ filename, content });
-});
 
 export default router;
