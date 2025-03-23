@@ -194,7 +194,7 @@ router.get(
       const filePath = path.join(__dirname, "..", "logs", filename);
 
       if (!fs.existsSync(filePath)) {
-        res.status(404).json({ error: "Archivo no encontrado" });
+        res.status(404).json({ error: `Archivo no encontrado: ${filename}` });
         return;
       }
 
@@ -206,6 +206,5 @@ router.get(
     }
   }
 );
-
 
 export default router;
